@@ -12,3 +12,13 @@
 ```shell
 Install-WindwosFeature AD-Domain-Services -IncludeManagementTools
 ```
+
+```
+Get-NetIPAddresses
+```
+
+### Joining the Workstation to the Doamin
+
+```
+Add-Computer -Domainname xyz.com -Credential xyz\Administrator -force -restart
+```
