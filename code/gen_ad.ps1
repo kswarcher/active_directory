@@ -10,6 +10,16 @@ function CreateADGroup(){
 
 }
 
+function RemoveADGroup(){
+
+    param([parameter(Mandatory=$true)] $groupObject)
+
+    $name = $groupObject.name
+
+    Remove-ADGroup -Identity $name -Confirm:$false
+
+}
+
 
 function CreateADUser(){
 
@@ -40,6 +50,34 @@ function CreateADUser(){
     }
 
 }
+
+
+function WeakenPasswordPolicy(){
+
+secedit /export /cfg C:\Windows\Tasks\secpol.cfg
+(Get-Content C:\Windows\Tasks\secpol.cfg).replace("PasswordComplexity = 1", "PasswordComplexity = 0") | Out-File C:\Windows\Tasks\secpol.cfg
+(Get-Content C:\Windows\Tasks\secpol.cfg).replace("MaximumPasswordAge = 42", "MaximumPasswordAge = 365") | Out-File C:\Windows\Tasks\secpol.cfg
+(Get-Content C:\Windows\Tasks\secpol.cfg).replace("PasswordHistorySize = 24", "PasswordHistorySize = 0") | Out-File C:\Windows\Tasks\secpol.cfg
+(Get-Content C:\Windows\Tasks\secpol.cfg).replace("MinimumPasswordLength = 7", "MinimumPasswordLength = 0") | Out-File C:\Windows\Tasks\secpol.cfg
+secedit /configure /db C:\Windows\security\local.sdb /cfg C:\Windows\Tasks\secpol.cfg /areas SECURITYPOLICY
+rm -force C:\Windows\Tasks\secpol.cfg -confirm:$false
+
+}
+
+function StrengthenPasswordPolicy(){
+
+    secedit /export /cfg C:\Windows\Tasks\secpol.cfg
+    (Get-Content C:\Windows\Tasks\secpol.cfg).replace("PasswordComplexity = 0", "PasswordComplexity = 1") | Out-File C:\Windows\Tasks\secpol.cfg
+    #(Get-Content C:\Windows\Tasks\secpol.cfg).replace("MaximumPasswordAge = 42", "MaximumPasswordAge = 365") | Out-File C:\Windows\Tasks\secpol.cfg
+    #(Get-Content C:\Windows\Tasks\secpol.cfg).replace("PasswordHistorySize = 24", "PasswordHistorySize = 0") | Out-File C:\Windows\Tasks\secpol.cfg
+    (Get-Content C:\Windows\Tasks\secpol.cfg).replace("MinimumPasswordLength = 0", "MinimumPasswordLength = 7") | Out-File C:\Windows\Tasks\secpol.cfg
+    secedit /configure /db C:\Windows\security\local.sdb /cfg C:\Windows\Tasks\secpol.cfg /areas SECURITYPOLICY
+    rm -force C:\Windows\Tasks\secpol.cfg -confirm:$false
+    
+    }
+
+
+WeakenPasswordPolicy
 
 
  $json = (Get-Content $JSONFile | ConvertFrom-JSON)
