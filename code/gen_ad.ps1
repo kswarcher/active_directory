@@ -1,4 +1,7 @@
-param([parameter(Mandatory=$true)] $JSONFile)
+param(
+    [parameter(Mandatory=$true)] $JSONFile,
+    [switch]$Undo
+    )
 
 function CreateADGroup(){
 
@@ -52,13 +55,25 @@ function CreateADUser(){
 }
 
 
+function RemoveADUser(){
+
+    param([parameter(Mandatory=$true)] $userObject)
+
+    $name = $userObject.name
+    $firstname, $lastname = $name.Split(" ")
+    $username = ($firstname[0] + $lastname).ToLower() 
+    $samAccountName = $username
+    Remove-ADUser -Identity $samAccountName -Confirm:$false
+
+}
+
 function WeakenPasswordPolicy(){
 
 secedit /export /cfg C:\Windows\Tasks\secpol.cfg
-(Get-Content C:\Windows\Tasks\secpol.cfg).replace("PasswordComplexity = 1", "PasswordComplexity = 0") | Out-File C:\Windows\Tasks\secpol.cfg
-(Get-Content C:\Windows\Tasks\secpol.cfg).replace("MaximumPasswordAge = 42", "MaximumPasswordAge = 365") | Out-File C:\Windows\Tasks\secpol.cfg
-(Get-Content C:\Windows\Tasks\secpol.cfg).replace("PasswordHistorySize = 24", "PasswordHistorySize = 0") | Out-File C:\Windows\Tasks\secpol.cfg
-(Get-Content C:\Windows\Tasks\secpol.cfg).replace("MinimumPasswordLength = 7", "MinimumPasswordLength = 0") | Out-File C:\Windows\Tasks\secpol.cfg
+(Get-Content C:\Windows\Tasks\secpol.cfg).replace("PasswordComplexity = 1", "PasswordComplexity = 0").replace("MaximumPasswordAge = 42", "MaximumPasswordAge = 365").replace("MinimumPasswordLength = 7", "MinimumPasswordLength = 0").replace("PasswordHistorySize = 24", "PasswordHistorySize = 0") | Out-File C:\Windows\Tasks\secpol.cfg
+#(Get-Content C:\Windows\Tasks\secpol.cfg).replace("MaximumPasswordAge = 42", "MaximumPasswordAge = 365") | Out-File C:\Windows\Tasks\secpol.cfg
+#(Get-Content C:\Windows\Tasks\secpol.cfg).replace("PasswordHistorySize = 24", "PasswordHistorySize = 0") | Out-File C:\Windows\Tasks\secpol.cfg
+#(Get-Content C:\Windows\Tasks\secpol.cfg).replace("MinimumPasswordLength = 7", "MinimumPasswordLength = 0") | Out-File C:\Windows\Tasks\secpol.cfg
 secedit /configure /db C:\Windows\security\local.sdb /cfg C:\Windows\Tasks\secpol.cfg /areas SECURITYPOLICY
 rm -force C:\Windows\Tasks\secpol.cfg -confirm:$false
 
@@ -67,30 +82,45 @@ rm -force C:\Windows\Tasks\secpol.cfg -confirm:$false
 function StrengthenPasswordPolicy(){
 
     secedit /export /cfg C:\Windows\Tasks\secpol.cfg
-    (Get-Content C:\Windows\Tasks\secpol.cfg).replace("PasswordComplexity = 0", "PasswordComplexity = 1") | Out-File C:\Windows\Tasks\secpol.cfg
+    (Get-Content C:\Windows\Tasks\secpol.cfg).replace("PasswordComplexity = 0", "PasswordComplexity = 1").replace("MinimumPasswordLength = 0", "MinimumPasswordLength = 7") | Out-File C:\Windows\Tasks\secpol.cfg
     #(Get-Content C:\Windows\Tasks\secpol.cfg).replace("MaximumPasswordAge = 42", "MaximumPasswordAge = 365") | Out-File C:\Windows\Tasks\secpol.cfg
     #(Get-Content C:\Windows\Tasks\secpol.cfg).replace("PasswordHistorySize = 24", "PasswordHistorySize = 0") | Out-File C:\Windows\Tasks\secpol.cfg
-    (Get-Content C:\Windows\Tasks\secpol.cfg).replace("MinimumPasswordLength = 0", "MinimumPasswordLength = 7") | Out-File C:\Windows\Tasks\secpol.cfg
+    #(Get-Content C:\Windows\Tasks\secpol.cfg).replace("MinimumPasswordLength = 0", "MinimumPasswordLength = 7") | Out-File C:\Windows\Tasks\secpol.cfg
     secedit /configure /db C:\Windows\security\local.sdb /cfg C:\Windows\Tasks\secpol.cfg /areas SECURITYPOLICY
     rm -force C:\Windows\Tasks\secpol.cfg -confirm:$false
     
     }
 
 
-WeakenPasswordPolicy
 
 
  $json = (Get-Content $JSONFile | ConvertFrom-JSON)
 
 $Global:Domain = $json.domain
 
-foreach ( $group in $json.groups){
+if ( -not $Undo){
 
+    WeakenPasswordPolicy
+
+foreach ( $group in $json.groups){
     CreateADGroup $group
  }
 
  foreach ( $user in $json.users){
-
     CreateADUser $user
-
  }
+
+}else{
+
+    StrengthenPasswordPolicy
+
+    foreach ( $user in $json.users){
+        RemoveADUser $user
+     }
+    foreach ( $group in $json.groups){
+        RemoveADGroup $group
+     }
+    
+     
+
+}
