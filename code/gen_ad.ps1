@@ -1,8 +1,12 @@
+#Getting the user inputs in the command, specify JSON file to read from and if the user wants to undo the AD
 param(
+
     [parameter(Mandatory=$true)] $JSONFile,
     [int]$Undo
+
     )
 
+#Creating the AD groups
 function CreateADGroup(){
 
     param([parameter(Mandatory=$true)] $groupObject)
@@ -13,6 +17,7 @@ function CreateADGroup(){
 
 }
 
+#Removing the AD groups
 function RemoveADGroup(){
 
     param([parameter(Mandatory=$true)] $groupObject)
@@ -23,7 +28,7 @@ function RemoveADGroup(){
 
 }
 
-
+#Creating an AD user
 function CreateADUser(){
 
     param([parameter(Mandatory=$true)] $userObject)
@@ -36,12 +41,15 @@ function CreateADUser(){
     $principalname = $username
     
     $password = $userObject.password
+
     #Actually create the AD user object
     New-ADUser -Name "$name" -GivenName $firstname -Surname $lastname -SamAccountName $samAccountName -userPrincipalName $principalname@$Global:Domain -AccountPassword (ConvertTo-SecureString $password -AsPlainText -Force) -PassThru | Enable-ADAccount
 
     foreach($group_name in $userObject.groups){
 
-        
+
+
+        #Making sure the user got added    
         try {
             Get-ADGroup -Identity "$group_name"
             Add-ADGroupMember -Identity $group_name -Members $username
@@ -54,14 +62,15 @@ function CreateADUser(){
 
     # Add to local admin group
     if ($userObject.local_admin){
-        #Add-LocalGroupMember -Group "Administrators" -Member "$Global:Domain\$username"
-        net localgroup administrators  $Global:Domain\$username /add
+        Add-LocalGroupMember -Group Administrators -Member $Global:Domain\$username
+        #net localgroup administrators  $Global:Domain\$username /add
     }
 
 
 }
 
 
+#Removing an AD user
 function RemoveADUser(){
 
     param([parameter(Mandatory=$true)] $userObject)
@@ -74,18 +83,20 @@ function RemoveADUser(){
 
 }
 
+#Making the password policy less secure, but easier to work with
 function WeakenPasswordPolicy(){
 
-secedit /export /cfg C:\Windows\Tasks\secpol.cfg
-(Get-Content C:\Windows\Tasks\secpol.cfg).replace("PasswordComplexity = 1", "PasswordComplexity = 0").replace("MaximumPasswordAge = 42", "MaximumPasswordAge = 365").replace("MinimumPasswordLength = 7", "MinimumPasswordLength = 0").replace("PasswordHistorySize = 24", "PasswordHistorySize = 0") | Out-File C:\Windows\Tasks\secpol.cfg
-#(Get-Content C:\Windows\Tasks\secpol.cfg).replace("MaximumPasswordAge = 42", "MaximumPasswordAge = 365") | Out-File C:\Windows\Tasks\secpol.cfg
-#(Get-Content C:\Windows\Tasks\secpol.cfg).replace("PasswordHistorySize = 24", "PasswordHistorySize = 0") | Out-File C:\Windows\Tasks\secpol.cfg
-#(Get-Content C:\Windows\Tasks\secpol.cfg).replace("MinimumPasswordLength = 7", "MinimumPasswordLength = 0") | Out-File C:\Windows\Tasks\secpol.cfg
-secedit /configure /db C:\Windows\security\local.sdb /cfg C:\Windows\Tasks\secpol.cfg /areas SECURITYPOLICY
-rm -force C:\Windows\Tasks\secpol.cfg -confirm:$false
+    secedit /export /cfg C:\Windows\Tasks\secpol.cfg
+    (Get-Content C:\Windows\Tasks\secpol.cfg).replace("PasswordComplexity = 1", "PasswordComplexity = 0").replace("MaximumPasswordAge = 42", "MaximumPasswordAge = 365").replace("MinimumPasswordLength = 7", "MinimumPasswordLength = 0").replace("PasswordHistorySize = 24", "PasswordHistorySize = 0") | Out-File C:\Windows\Tasks\secpol.cfg
+    #(Get-Content C:\Windows\Tasks\secpol.cfg).replace("MaximumPasswordAge = 42", "MaximumPasswordAge = 365") | Out-File C:\Windows\Tasks\secpol.cfg
+    #(Get-Content C:\Windows\Tasks\secpol.cfg).replace("PasswordHistorySize = 24", "PasswordHistorySize = 0") | Out-File C:\Windows\Tasks\secpol.cfg
+    #(Get-Content C:\Windows\Tasks\secpol.cfg).replace("MinimumPasswordLength = 7", "MinimumPasswordLength = 0") | Out-File C:\Windows\Tasks\secpol.cfg
+    secedit /configure /db C:\Windows\security\local.sdb /cfg C:\Windows\Tasks\secpol.cfg /areas SECURITYPOLICY
+    Remove-Item C:\Windows\Tasks\secpol.cfg -Force -Confirm:$False
 
 }
 
+#Making the password policy stronger
 function StrengthenPasswordPolicy(){
 
     secedit /export /cfg C:\Windows\Tasks\secpol.cfg
@@ -94,28 +105,29 @@ function StrengthenPasswordPolicy(){
     #(Get-Content C:\Windows\Tasks\secpol.cfg).replace("PasswordHistorySize = 24", "PasswordHistorySize = 0") | Out-File C:\Windows\Tasks\secpol.cfg
     #(Get-Content C:\Windows\Tasks\secpol.cfg).replace("MinimumPasswordLength = 0", "MinimumPasswordLength = 7") | Out-File C:\Windows\Tasks\secpol.cfg
     secedit /configure /db C:\Windows\security\local.sdb /cfg C:\Windows\Tasks\secpol.cfg /areas SECURITYPOLICY
-    rm -force C:\Windows\Tasks\secpol.cfg -confirm:$false
+    Remove-Item C:\Windows\Tasks\secpol.cfg -Force -Confirm:$Falsese
     
     }
 
 
 
-
- $json = (Get-Content $JSONFile | ConvertFrom-JSON)
+#Getting info from the json file for person info
+$json = (Get-Content $JSONFile | ConvertFrom-JSON)
 
 $Global:Domain = $json.domain
 
+#Determining if the AD needs to be set up or torn down
 if ( -not $Undo){
 
     WeakenPasswordPolicy
+    
+    foreach ( $group in $json.groups){
+        CreateADGroup $group
+    }
 
-foreach ( $group in $json.groups){
-    CreateADGroup $group
- }
-
- foreach ( $user in $json.users){
-    CreateADUser $user
- }
+    foreach ( $user in $json.users){
+        CreateADUser $user
+    }
 
 }else{
 
@@ -123,11 +135,10 @@ foreach ( $group in $json.groups){
 
     foreach ( $user in $json.users){
         RemoveADUser $user
-     }
+    }
     foreach ( $group in $json.groups){
         RemoveADGroup $group
-     }
+    }
     
-     
 
 }
