@@ -1,6 +1,6 @@
 param(
     [parameter(Mandatory=$true)] $JSONFile,
-    [switch]$Undo
+    [int]$Undo
     )
 
 function CreateADGroup(){
@@ -51,6 +51,13 @@ function CreateADUser(){
         }
 
     }
+
+    # Add to local admin group
+    if ($userObject.local_admin){
+        #Add-LocalGroupMember -Group "Administrators" -Member "$Global:Domain\$username"
+        net localgroup administrators  $Global:Domain\$username /add
+    }
+
 
 }
 

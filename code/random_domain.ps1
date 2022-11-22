@@ -1,4 +1,9 @@
-param( [Parameter(Mandatory=$true)] $OutputJSONFile)
+param( 
+    [Parameter(Mandatory=$true)] $OutputJSONFile,
+    [int]$num_users,
+    [int]$num_groups,
+    [int]$num_localAdmin
+    )
 
 #Getting data from files
 
@@ -11,30 +16,48 @@ $passwords = [System.Collections.ArrayList](Get-Content "data/passwords.txt")
 $groups = @()
 $users = @()
 
-$num_groups = 10
+if ($num_users -eq 0){
+    $num_users = 5
+}
+if ($num_groups -eq 0){
+    $num_groups = 1
+}
 
 
-for ( $i = 0; $i -lt $num_groups; $i++){
+if ($num_localAdmin -ne 0){
+    $local_admin_indexes = @()
+    while(($local_admin_indexes | Measure-Object).Count -lt $num_localAdmin){
+
+        $random_index = (Get-Random -InputObject (1..$num_users) | Where-Object{$local_admin_indexes -notcontains $_})
+        $local_admin_indexes += $random_index
+    }
+}
+
+
+for ( $i = 1; $i -le $num_groups; $i++){
 $group_name = (Get-Random -InputObject $group_names )
 $group = @{"name"="$group_name"}
 $groups+= $group
 $group_names.Remove($group_name)
 }
 
-##Making 100 random users
 
+##Making random users
 
-$num_users = 100
-
-for ( $i = 0; $i -lt $num_users; $i++){
+for ( $i = 1; $i -le $num_users; $i++){
 $first_name = (Get-Random -InputObject $first_names)
 $last_name = (Get-Random -InputObject $last_names)
 $password = (Get-Random -InputObject $passwords)
-$new_user = @{`
+$new_user = @{
     "name"="$first_name $last_name"
     "password"="$password"
     "groups" = @( (Get-Random -InputObject $groups).name)
 }
+
+if($local_admin_indexes | Where {$_ -eq $i}){
+    $new_user["local_admin"] = $true
+}
+
 $users+=$new_user
 $first_names.Remove($first_name)
 $last_names.Remove($last_name)
